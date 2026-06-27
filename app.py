@@ -50,7 +50,9 @@ except ModuleNotFoundError as e:
 # --------------------------------------------------------------------------- #
 # CONFIG
 # --------------------------------------------------------------------------- #
-SAVED_MANDATES_DIR = "saved_mandates"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVED_MANDATES_DIR = os.path.join(BASE_DIR, "saved_mandates")
+DEMO_HOLDINGS = os.path.join(BASE_DIR, "demo_holdings", "Client_Targeted_Rebalance_v1.xlsx")
 PRICE_CACHE_TTL = 300
 os.makedirs(SAVED_MANDATES_DIR, exist_ok=True)
 st.set_page_config(page_title="Portfolio Implementation Engine", layout="wide",
@@ -135,6 +137,7 @@ LANG = {
         "upload_holdings": "Upload client holdings (CSV or Excel)",
         "empty_title": "Upload client holdings to begin",
         "waiting_holdings": "Add a file with Ticker and Quantity columns to run the live analysis.",
+        "demo_banner": "Showing a sample portfolio so you can explore the engine. Upload your own holdings above to replace it.",
         "curr_val": "Current portfolio value",
         "household_value": "Household value",
         "cash_flow": "Tactical cash flow",
@@ -235,6 +238,7 @@ Cash is `CASH_USD` / `CASH_CAD` with the dollar amount as quantity.
         "upload_holdings": "Téléverser les positions (CSV ou Excel)",
         "empty_title": "Téléversez les positions pour commencer",
         "waiting_holdings": "Ajoutez un fichier avec les colonnes Ticker et Quantité.",
+        "demo_banner": "Affichage d'un portefeuille exemple pour explorer le moteur. Téléversez vos propres positions ci-dessus pour le remplacer.",
         "curr_val": "Valeur actuelle",
         "household_value": "Valeur du ménage",
         "cash_flow": "Flux de trésorerie",
@@ -749,10 +753,22 @@ st.markdown(f"**{t['client_holdings']}**")
 holdings_file = st.file_uploader(t["upload_holdings"], type=["csv", "xlsx", "xls"], key="client_file")
 if holdings_file is not None:
     st.session_state.cached_holdings = read_tabular(holdings_file, "holdings")
+    st.session_state.using_demo = False
+elif "cached_holdings" not in st.session_state:
+    # First visit, nothing uploaded — auto-load the bundled demo portfolio so the
+    # engine shows a live analysis immediately. An upload replaces it.
+    if os.path.exists(DEMO_HOLDINGS):
+        st.session_state.cached_holdings = read_tabular(DEMO_HOLDINGS, "holdings")
+        st.session_state.using_demo = True
+    else:
+        st.session_state.cached_holdings = None
 
-if "cached_holdings" not in st.session_state or st.session_state.cached_holdings is None:
+if st.session_state.get("cached_holdings") is None:
     st.caption(t["waiting_holdings"])
     render_instructions(expanded=True); render_footer(); st.stop()
+
+if st.session_state.get("using_demo"):
+    notice(t["demo_banner"], "info")
 
 holdings_df = st.session_state.cached_holdings.copy()
 holdings_df["Ticker"] = holdings_df["Ticker"].astype(str).str.strip().str.upper()
